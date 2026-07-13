@@ -1,0 +1,17 @@
+{
+  "name": "instagram-ai-affiliate-bot",
+  "version": "1.0.0",
+  "description": "Instagram DM bot: reel -> AI product detection -> multi-retailer affiliate landing page",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "uuid": "^9.0.1"
+  }
+}
