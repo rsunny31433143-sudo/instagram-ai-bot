@@ -2,8 +2,9 @@ const fs = require('fs');
 const axios = require('axios');
 
 /**
- * Sends a single frame to Claude's vision API and asks it to identify
- * the main product shown, returning structured JSON.
+ * Sends a single frame to Google's Gemini vision API (free tier, no credit card
+ * required - get a key at aistudio.google.com) and asks it to identify the
+ * main product shown, returning structured JSON.
  *
  * NOTE: this identifies WHAT the product is (name/category/brand/color).
  * It does not find the exact retailer listing - that's retailerMatcher.js's job.
@@ -12,47 +13,38 @@ async function identifyProductInFrame(framePath) {
   const imageBase64 = fs.readFileSync(framePath).toString('base64');
 
   const response = await axios.post(
-    'https://api.anthropic.com/v1/messages',
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`,
     {
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
-      messages: [
+      contents: [
         {
-          role: 'user',
-          content: [
+          parts: [
             {
-              type: 'image',
-              source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 }
-            },
-            {
-              type: 'text',
               text:
                 'Identify the single main product being showcased in this image (e.g. from a product reel). ' +
                 'Respond ONLY with JSON, no markdown fences, no extra text, in this exact shape: ' +
                 '{"found": boolean, "productName": string, "category": string, "color": string, "brandGuess": string, "searchQuery": string}. ' +
                 'searchQuery should be a short, generic shopping-search phrase (3-6 words) suitable for searching Amazon/Flipkart/Myntra. ' +
                 'If no clear product is visible, set found to false and leave other fields as empty strings.'
+            },
+            {
+              inline_data: { mime_type: 'image/jpeg', data: imageBase64 }
             }
           ]
         }
       ]
     },
-    {
-      headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      }
-    }
+    { headers: { 'content-type': 'application/json' } }
   );
 
-  const textBlock = response.data.content.find((b) => b.type === 'text');
-  if (!textBlock) return { found: false };
+  const rawText = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawText) return { found: false };
 
   try {
-    return JSON.parse(textBlock.text.trim());
+    // Gemini sometimes wraps JSON in ```json fences despite instructions - strip them
+    const cleaned = rawText.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleaned);
   } catch (err) {
-    console.error('Failed to parse product JSON:', textBlock.text);
+    console.error('Failed to parse product JSON:', rawText);
     return { found: false };
   }
 }
